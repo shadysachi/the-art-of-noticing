@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7eef4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Dear Diary">
+<link rel="manifest" href="manifest.json">
+<title>Dear Diary</title>
+<style>
+:root{--bg:#fbf7fa;--card:#fff;--ink:#332b32;--muted:#8d7e89;--accent:#b783a2;--line:#eadfe7}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif}
+main{max-width:720px;margin:auto;padding:calc(22px + env(safe-area-inset-top)) 18px 40px}
+h1{font-family:Georgia,serif;font-weight:500;margin:4px 0 2px;font-size:34px}.sub{color:var(--muted);margin-bottom:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 8px 25px #3b233d0b;margin-bottom:14px}
+label{font-size:13px;color:var(--muted);display:block;margin:0 0 7px}
+input,textarea,select{width:100%;border:1px solid var(--line);border-radius:13px;padding:12px;background:#fff;color:var(--ink);font:inherit}
+textarea{min-height:240px;resize:vertical;line-height:1.6}
+.row{display:flex;gap:10px}.row>*{flex:1}
+button{border:0;border-radius:13px;padding:12px 15px;font-weight:600;font-size:14px;cursor:pointer}
+.primary{background:var(--accent);color:white}.secondary{background:#f1e8ef;color:#594657}.danger{background:#f7e6e8;color:#9b505b}
+nav{display:flex;gap:8px;margin-bottom:16px}nav button{flex:1}.hidden{display:none!important}
+.entries{display:grid;gap:10px}.entry{padding:15px;border:1px solid var(--line);border-radius:17px;background:white;cursor:pointer}
+.entry h3{margin:0 0 4px;font-family:Georgia,serif;font-weight:500}.entry small{color:var(--muted)}.entry p{margin:8px 0 0;color:#665a64;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mood{font-size:23px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.toolbar button{flex:1;min-width:120px}
+#lock{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;z-index:5}
+.lockbox{max-width:400px;width:100%;text-align:center}.lockbox h1{font-size:42px}
+.note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:12px}
+</style>
+</head>
+<body>
+<div id="lock" class="hidden">
+  <div class="lockbox card">
+    <h1>Dear Diary</h1><p>Your diary is locked.</p>
+    <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="PIN">
+    <button class="primary" style="width:100%;margin-top:10px" onclick="unlock()">Unlock</button>
+    <p id="pinMsg" class="note"></p>
+  </div>
+</div>
+
+<main>
+<h1>Dear Diary ♡</h1><div class="sub" id="today"></div>
+<nav><button class="secondary" onclick="showEditor()">✍️ New Entry</button><button class="secondary" onclick="showEntries()">📖 Entries</button></nav>
+
+<section id="editor" class="card">
+  <div class="row"><div><label>Date</label><input id="date" type="date"></div>
+  <div><label>Mood</label><select id="mood"><option>🙂</option><option>🥰</option><option>😭</option><option>😤</option><option>😌</option><option>🥹</option><option>😵‍💫</option><option>🤍</option></select></div></div>
+  <div style="margin-top:14px"><label>Title</label><input id="title" placeholder="Today was..."></div>
+  <div style="margin-top:14px"><label>Dear diary,</label><textarea id="body" placeholder="Write whatever is on your mind..."></textarea></div>
+  <div class="toolbar" style="margin-top:12px"><button class="primary" onclick="saveEntry()">Save Entry</button><button class="secondary" onclick="clearEditor()">Clear</button></div>
+</section>
+
+<section id="entries" class="hidden">
+  <div class="card"><input id="search" placeholder="Search your entries..." oninput="renderEntries()"></div>
+  <div id="entryList" class="entries"></div>
+</section>
+
+<section class="card">
+<label>Privacy & Backup</label>
+<div class="toolbar"><button class="secondary" onclick="setPin()">🔐 Set PIN</button><button class="secondary" onclick="exportData()">⬇️ Backup</button><button class="secondary" onclick="importData()">⬆️ Restore</button><button class="danger" onclick="deleteAll()">Delete all</button></div>
+<p class="note">Entries are stored locally on this device using IndexedDB. They are not sent to a server by this app. Keep a backup if the diary is important to you.</p>
+</section>
+</main>
+
+<script>
+const DB='dear-diary-db', STORE='entries'; let editingId=null;
+const $=id=>document.getElementById(id);
+function todayISO(){return new Date().toISOString().slice(0,10)}
+function pretty(d){return new Date(d+'T12:00:00').toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'})}
+function db(){return new Promise((res,rej)=>{let r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE,{keyPath:'id'});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function all(){let d=await db();return new Promise((res,rej)=>{let r=d.transaction(STORE).objectStore(STORE).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function put(x){let d=await db();return new Promise((res,rej)=>{let r=d.transaction(STORE,'readwrite').objectStore(STORE).put(x);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
+async function remove(id){let d=await db();d.transaction(STORE,'readwrite').objectStore(STORE).delete(id)}
+function showEditor(){ $('editor').classList.remove('hidden');$('entries').classList.add('hidden') }
+function showEntries(){ $('editor').classList.add('hidden');$('entries').classList.remove('hidden');renderEntries() }
+function clearEditor(){editingId=null;$('date').value=todayISO();$('mood').value='🙂';$('title').value='';$('body').value=''}
+async function saveEntry(){let body=$('body').value.trim();if(!body){alert('Write something first 🤍');return}await put({id:editingId||crypto.randomUUID(),date:$('date').value||todayISO(),mood:$('mood').value,title:$('title').value.trim()||'Untitled entry',body,updated:Date.now()});clearEditor();alert('Saved ♡')}
+async function renderEntries(){let q=$('search').value.toLowerCase();let a=(await all()).sort((x,y)=>y.date.localeCompare(x.date)||y.updated-x.updated).filter(x=>(x.title+' '+x.body).toLowerCase().includes(q));$('entryList').innerHTML=a.length?a.map(x=>`<div class="entry" onclick="editEntry('${x.id}')"><h3>${esc(x.mood)} ${esc(x.title)}</h3><small>${pretty(x.date)}</small><p>${esc(x.body)}</p></div>`).join(''):'<div class="card" style="text-align:center;color:#8d7e89">No entries yet. Start writing ♡</div>'}
+async function editEntry(id){let x=(await all()).find(e=>e.id===id);if(!x)return;editingId=x.id;$('date').value=x.date;$('mood').value=x.mood;$('title').value=x.title;$('body').value=x.body;showEditor();scrollTo(0,0)}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+async function deleteAll(){if(!confirm('Delete ALL diary entries? This cannot be undone unless you have a backup.'))return;let d=await db();let tx=d.transaction(STORE,'readwrite');tx.objectStore(STORE).clear();clearEditor();showEntries()}
+async function exportData(){let data={app:'Dear Diary',version:1,entries:await all()};let b=new Blob([JSON.stringify(data)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='dear-diary-backup.json';a.click();URL.revokeObjectURL(u)}
+function importData(){let i=document.createElement('input');i.type='file';i.accept='.json,application/json';i.onchange=async()=>{let f=i.files[0];if(!f)return;try{let x=JSON.parse(await f.text());for(let e of (x.entries||[]))await put(e);alert('Backup restored ♡');showEntries()}catch(e){alert('That backup file could not be read.')}};i.click()}
+async function setPin(){let p=prompt('Set a 4–6 digit PIN. Leave blank to remove PIN.');if(p===null)return;if(p&&!/^\\d{4,6}$/.test(p)){alert('Use 4–6 digits.');return}if(p)localStorage.setItem('diaryPin',p);else localStorage.removeItem('diaryPin');alert(p?'PIN enabled 🔐':'PIN removed')}
+function unlock(){if($('pinInput').value===localStorage.getItem('diaryPin')){$('lock').classList.add('hidden');$('pinMsg').textContent=''}else $('pinMsg').textContent='Wrong PIN.'}
+$('today').textContent=new Date().toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+clearEditor();
+if(localStorage.getItem('diaryPin'))$('lock').classList.remove('hidden');
+</script>
+</body></html>

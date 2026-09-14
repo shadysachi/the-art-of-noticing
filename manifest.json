@@ -1,0 +1,9 @@
+{
+  "name":"Dear Diary",
+  "short_name":"Diary",
+  "start_url":"./index.html",
+  "display":"standalone",
+  "background_color":"#fbf7fa",
+  "theme_color":"#f7eef4",
+  "icons":[]
+}
